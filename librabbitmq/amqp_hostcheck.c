@@ -23,7 +23,7 @@
  * copyright holder.
  */
 
-#include "amqp_hostcheck.h"
+#include "amqp_private.h"
 
 #include <string.h>
 
@@ -145,15 +145,15 @@ amqp_raw_nequal(const char *first, const char *second, size_t max)
  * http://tools.ietf.org/html/rfc6125#section-6.4.3
  */
 
-static amqp_hostcheck_result amqp_hostmatch(const char *hostname,
-                                            const char *pattern) {
+static int
+amqp_hostmatch(const char *hostname, const char *pattern)
+{
   const char *pattern_label_end, *pattern_wildcard, *hostname_label_end;
   int wildcard_enabled;
   size_t prefixlen, suffixlen;
   pattern_wildcard = strchr(pattern, '*');
   if (pattern_wildcard == NULL) {
-    return amqp_raw_equal(pattern, hostname) ? AMQP_HCR_MATCH
-                                             : AMQP_HCR_NO_MATCH;
+    return amqp_raw_equal(pattern, hostname) ? 1 : 0;
   }
   /* We require at least 2 dots in pattern to avoid too wide wildcard match. */
   wildcard_enabled = 1;
@@ -165,37 +165,37 @@ static amqp_hostcheck_result amqp_hostmatch(const char *hostname,
     wildcard_enabled = 0;
   }
   if (!wildcard_enabled) {
-    return amqp_raw_equal(pattern, hostname) ? AMQP_HCR_MATCH
-                                             : AMQP_HCR_NO_MATCH;
+    return amqp_raw_equal(pattern, hostname) ? 1 : 0;
   }
   hostname_label_end = strchr(hostname, '.');
   if (hostname_label_end == NULL ||
       !amqp_raw_equal(pattern_label_end, hostname_label_end)) {
-    return AMQP_HCR_NO_MATCH;
+    return 0;
   }
   /* The wildcard must match at least one character, so the left-most
    * label of the hostname is at least as large as the left-most label
    * of the pattern.
    */
   if (hostname_label_end - hostname < pattern_label_end - pattern) {
-    return AMQP_HCR_NO_MATCH;
+    return 0;
   }
   prefixlen = pattern_wildcard - pattern;
   suffixlen = pattern_label_end - (pattern_wildcard + 1);
   return amqp_raw_nequal(pattern, hostname, prefixlen) &&
     amqp_raw_nequal(pattern_wildcard + 1, hostname_label_end - suffixlen,
-                    suffixlen) ? AMQP_HCR_MATCH : AMQP_HCR_NO_MATCH;
+                    suffixlen) ? 1 : 0;
 }
 
-amqp_hostcheck_result amqp_hostcheck(const char *match_pattern,
-                                     const char *hostname) {
+int
+amqp_hostcheck(const char *match_pattern, const char *hostname)
+{
   /* sanity check */
   if (!match_pattern || !*match_pattern || !hostname || !*hostname) {
-    return AMQP_HCR_NO_MATCH;
+    return 0;
   }
   /* trivial case */
   if (amqp_raw_equal(hostname, match_pattern)) {
-    return AMQP_HCR_MATCH;
+    return 1;
   }
   return amqp_hostmatch(hostname, match_pattern);
 }
