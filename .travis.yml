@@ -39,7 +39,11 @@ script:
 
 addons:
   apt:
+    sources:
+      # Use a newer version of CMake that has Ninja support for faster builds.
+      - kalakris-cmake
     packages:
+      - cmake
       - libpopt-dev
       - ninja-build
 
