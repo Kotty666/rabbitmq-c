@@ -9,26 +9,29 @@ build_autotools() {
 build_cmake() {
   mkdir $PWD/_build && cd $PWD/_build
   cmake --version
+  ninja --version
   cmake .. -GNinja -DCMAKE_INSTALL_PREFIX=$PWD/../_install -DCMAKE_C_FLAGS="-Werror"
-  cmake --build . --target install
+  cmake --build . --target install -- -j 3
   ctest -V .
 }
 
 build_asan() {
   mkdir $PWD/_build && cd $PWD/_build
   cmake --version
+  ninja --version
   cmake .. -GNinja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$PWD/../_install \
     -DCMAKE_C_FLAGS="-Werror -fsanitize=address,undefined -O1"
-  cmake --build . --target install
+  cmake --build . --target install -- -j 3
   ctest -V .
 }
 
 build_tsan() {
   mkdir $PWD/_build && cd $PWD/_build
   cmake --version
+  ninja --version
   cmake .. -GNinja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=$PWD/../_install \
     -DCMAKE_C_FLAGS="-Werror -fsanitize=thread,undefined -O1"
-  cmake --build . --target install
+  cmake --build . --target install -- -j 3
   ctest -V .
 }
 
