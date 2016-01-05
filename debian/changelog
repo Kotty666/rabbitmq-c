@@ -1,3 +1,9 @@
+librabbitmq (0.5.2-2~bpo7+1) wheezy-backports; urgency=medium
+
+  * Rebuild for wheezy-backports.
+
+ -- Philipp Frik <kotty@guns-n-girls.de>  Tue, 05 Jan 2016 15:30:34 +0100
+
 librabbitmq (0.5.2-2) unstable; urgency=medium
 
   * Add patch to enable SSL for tools (Closes: #764080).
