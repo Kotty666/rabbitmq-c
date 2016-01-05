@@ -10,17 +10,18 @@ This is a C-language AMQP client library for use with v2.0+ of the
  - <http://github.com/alanxz/rabbitmq-c>
 
 Announcements regarding the library are periodically made on the
-rabbitmq-users mailing list:
+rabbitmq-discuss mailing list:
 
- - <https://groups.google.com/forum/#!forum/rabbitmq-users>
+ - <http://lists.rabbitmq.com/cgi-bin/mailman/listinfo/rabbitmq-discuss>
 
 ## Latest Stable Version
 
-The latest stable release of rabbitmq-c can be found at:
+The latest stable release of [rabbitmq-c is v0.5.2](https://github.com/alanxz/rabbitmq-c/releases/tag/v0.5.2).
+A complete list of changes can be found in the [Change Log](ChangeLog.md)
 
- - <https://github.com/alanxz/rabbitmq-c/releases/latest>
+The v0.5.2 source tarball can be downloaded from:
 
-## Documentation
+<https://github.com/alanxz/rabbitmq-c/releases/download/v0.5.2/rabbitmq-c-0.5.2.tar.gz>
 
 API documentation for v0.5.0+ can viewed from:
 

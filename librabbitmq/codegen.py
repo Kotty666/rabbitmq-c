@@ -144,9 +144,7 @@ class StrType(object):
         emitter.emit("}")
 
     def encode(self, emitter, value):
-        emitter.emit("if (UINT%d_MAX < %s.len" % (self.lenbits, value))
-        emitter.emit("    || !amqp_encode_%d(encoded, &offset, (uint%d_t)%s.len)" %
-                (self.lenbits, self.lenbits, value))
+        emitter.emit("if (!amqp_encode_%d(encoded, &offset, %s.len)" % (self.lenbits, value))
         emitter.emit("    || !amqp_encode_bytes(encoded, &offset, %s))" % (value,))
         emitter.emit("  return AMQP_STATUS_BAD_AMQP_DATA;")
 
@@ -227,6 +225,7 @@ apiMethodInfo  = {
     "amqp_channel_open": ["out_of_band"],
     "amqp_channel_close": False, # needs special handling
     "amqp_access_request": False, # huh?
+    "amqp_exchange_declare": ["auto_delete", "internal"],
     "amqp_basic_get": False, # get-ok has content
 }
 
@@ -286,9 +285,12 @@ def genErl(spec):
 
     def genDecodeMethodFields(m):
         print "    case %s: {" % (m.defName(),)
-        print "      %s *m = (%s *) amqp_pool_alloc(pool, sizeof(%s));" % \
-            (m.structName(), m.structName(), m.structName())
-        print "      if (m == NULL) { return AMQP_STATUS_NO_MEMORY; }"
+        if m.arguments:
+            print "      %s *m = (%s *) amqp_pool_alloc(pool, sizeof(%s));" % \
+                (m.structName(), m.structName(), m.structName())
+            print "      if (m == NULL) { return AMQP_STATUS_NO_MEMORY; }"
+        else:
+            print "      %s *m = NULL; /* no fields */" % (m.structName(),)
 
         emitter = BitDecoder(Emitter("      "))
         for f in m.arguments:
@@ -325,7 +327,7 @@ def genErl(spec):
             typeFor(spec, f).encode(emitter, "m->"+c_ize(f.name))
         emitter.flush()
 
-        print "      return (int)offset;"
+        print "      return offset;"
         print "    }"
 
     def genEncodeProperties(c):
@@ -339,7 +341,7 @@ def genErl(spec):
             typeFor(spec, f).encode(emitter, "p->"+c_ize(f.name))
             emitter.emit("}")
 
-        print "      return (int)offset;"
+        print "      return offset;"
         print "    }"
 
     methods = spec.allMethods()

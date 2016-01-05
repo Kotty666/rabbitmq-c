@@ -39,7 +39,7 @@ int amqp_basic_properties_clone(amqp_basic_properties_t *original,
                                 amqp_basic_properties_t *clone,
                                 amqp_pool_t *pool)
 {
-  memset(clone, 0, sizeof(*clone));
+  memset(clone, 0, sizeof(amqp_basic_properties_t));
   clone->_flags = original->_flags;
 
 #define CLONE_BYTES_POOL(original, clone, pool)         \
@@ -148,8 +148,8 @@ amqp_consume_message(amqp_connection_state_t state, amqp_envelope_t *envelope,
   amqp_basic_deliver_t *delivery_method;
   amqp_rpc_reply_t ret;
 
-  memset(&ret, 0, sizeof(ret));
-  memset(envelope, 0, sizeof(*envelope));
+  memset(&ret, 0, sizeof(amqp_rpc_reply_t));
+  memset(envelope, 0, sizeof(amqp_envelope_t));
 
   res = amqp_simple_wait_frame_noblock(state, &frame, timeout);
   if (AMQP_STATUS_OK != res) {
@@ -211,8 +211,8 @@ amqp_rpc_reply_t amqp_read_message(amqp_connection_state_t state,
   char *body_read_ptr;
   int res;
 
-  memset(&ret, 0, sizeof(ret));
-  memset(message, 0, sizeof(*message));
+  memset(&ret, 0, sizeof(amqp_rpc_reply_t));
+  memset(message, 0, sizeof(amqp_message_t));
 
   res = amqp_simple_wait_frame_on_channel(state, channel, &frame);
   if (AMQP_STATUS_OK != res) {
@@ -252,12 +252,7 @@ amqp_rpc_reply_t amqp_read_message(amqp_connection_state_t state,
   if (0 == frame.payload.properties.body_size) {
     message->body = amqp_empty_bytes;
   } else {
-    if (SIZE_MAX < frame.payload.properties.body_size) {
-      ret.reply_type = AMQP_RESPONSE_LIBRARY_EXCEPTION;
-      ret.library_error = AMQP_STATUS_NO_MEMORY;
-      goto error_out1;
-    }
-    message->body = amqp_bytes_malloc((size_t)frame.payload.properties.body_size);
+    message->body = amqp_bytes_malloc(frame.payload.properties.body_size);
     if (NULL == message->body.bytes) {
       ret.reply_type = AMQP_RESPONSE_LIBRARY_EXCEPTION;
       ret.library_error = AMQP_STATUS_NO_MEMORY;

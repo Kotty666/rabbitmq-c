@@ -39,7 +39,6 @@
 #endif
 
 #include "amqp_private.h"
-#include "amqp_table.h"
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -106,18 +105,14 @@ static int amqp_decode_array(amqp_bytes_t encoded,
 
   output->num_entries = num_entries;
   output->entries = amqp_pool_alloc(pool, num_entries * sizeof(amqp_field_value_t));
+  res = AMQP_STATUS_NO_MEMORY;
   /* NULL is legitimate if we requested a zero-length block. */
-  if (output->entries == NULL) {
-    if (num_entries == 0) {
-      res = AMQP_STATUS_OK;
-    } else {
-      res = AMQP_STATUS_NO_MEMORY;
-    }
+  if (output->entries == NULL && num_entries > 0) {
     goto out;
   }
 
   memcpy(output->entries, entries, num_entries * sizeof(amqp_field_value_t));
-  res = AMQP_STATUS_OK;
+  res = 0;
 
 out:
   free(entries);
@@ -182,13 +177,9 @@ int amqp_decode_table(amqp_bytes_t encoded,
 
   output->num_entries = num_entries;
   output->entries = amqp_pool_alloc(pool, num_entries * sizeof(amqp_table_entry_t));
+  res = AMQP_STATUS_NO_MEMORY;
   /* NULL is legitimate if we requested a zero-length block. */
-  if (output->entries == NULL) {
-    if (num_entries == 0) {
-      res = AMQP_STATUS_OK;
-    } else {
-      res = AMQP_STATUS_NO_MEMORY;
-    }
+  if (output->entries == NULL && num_entries > 0) {
     goto out;
   }
 
@@ -308,7 +299,7 @@ static int amqp_encode_array(amqp_bytes_t encoded,
     }
   }
 
-  if (!amqp_encode_32(encoded, &start, (uint32_t)(*offset - start - 4))) {
+  if (!amqp_encode_32(encoded, &start, *offset - start - 4)) {
     res = AMQP_STATUS_TABLE_TOO_BIG;
     goto out;
   }
@@ -329,7 +320,7 @@ int amqp_encode_table(amqp_bytes_t encoded,
   *offset += 4; /* size of the table gets filled in later on */
 
   for (i = 0; i < input->num_entries; i++) {
-    if (!amqp_encode_8(encoded, offset, (uint8_t)input->entries[i].key.len)) {
+    if (!amqp_encode_8(encoded, offset, input->entries[i].key.len)) {
       res = AMQP_STATUS_TABLE_TOO_BIG;
       goto out;
     }
@@ -345,7 +336,7 @@ int amqp_encode_table(amqp_bytes_t encoded,
     }
   }
 
-  if (!amqp_encode_32(encoded, &start, (uint32_t)(*offset - start - 4))) {
+  if (!amqp_encode_32(encoded, &start, *offset - start - 4)) {
     res = AMQP_STATUS_TABLE_TOO_BIG;
     goto out;
   }
@@ -417,7 +408,7 @@ static int amqp_encode_field_value(amqp_bytes_t encoded,
        same implementation, but different interpretations. */
     /* fall through */
   case AMQP_FIELD_KIND_BYTES:
-    if (!amqp_encode_32(encoded, offset, (uint32_t)entry->value.bytes.len)
+    if (!amqp_encode_32(encoded, offset, entry->value.bytes.len)
         || !amqp_encode_bytes(encoded, offset, entry->value.bytes)) {
       res = AMQP_STATUS_TABLE_TOO_BIG;
       goto out;
@@ -469,11 +460,11 @@ int amqp_table_entry_cmp(void const *entry1, void const *entry2)
     return d;
   }
 
-  return (int)p1->key.len - (int)p2->key.len;
+  return p1->key.len - p2->key.len;
 }
 
 static int
-amqp_field_value_clone(const amqp_field_value_t *original, amqp_field_value_t *clone, amqp_pool_t *pool)
+amqp_field_value_clone(amqp_field_value_t *original, amqp_field_value_t *clone, amqp_pool_t *pool)
 {
   int i;
   int res;
@@ -576,7 +567,7 @@ amqp_field_value_clone(const amqp_field_value_t *original, amqp_field_value_t *c
 
 
 static int
-amqp_table_entry_clone(const amqp_table_entry_t *original, amqp_table_entry_t *clone, amqp_pool_t *pool)
+amqp_table_entry_clone(amqp_table_entry_t *original, amqp_table_entry_t *clone, amqp_pool_t *pool)
 {
   if (0 == original->key.len) {
     return AMQP_STATUS_INVALID_PARAMETER;
@@ -593,7 +584,7 @@ amqp_table_entry_clone(const amqp_table_entry_t *original, amqp_table_entry_t *c
 }
 
 int
-amqp_table_clone(const amqp_table_t *original, amqp_table_t *clone, amqp_pool_t *pool)
+amqp_table_clone(amqp_table_t *original, amqp_table_t *clone, amqp_pool_t *pool)
 {
   int i;
   int res;
@@ -620,43 +611,4 @@ amqp_table_clone(const amqp_table_t *original, amqp_table_t *clone, amqp_pool_t 
 
 error_out1:
   return res;
-}
-
-amqp_table_entry_t amqp_table_construct_utf8_entry(const char *key,
-                                                   const char *value) {
-  amqp_table_entry_t ret;
-  ret.key = amqp_cstring_bytes(key);
-  ret.value.kind = AMQP_FIELD_KIND_UTF8;
-  ret.value.value.bytes = amqp_cstring_bytes(value);
-  return ret;
-}
-
-amqp_table_entry_t amqp_table_construct_table_entry(const char *key,
-                                                    const amqp_table_t *value) {
-  amqp_table_entry_t ret;
-  ret.key = amqp_cstring_bytes(key);
-  ret.value.kind = AMQP_FIELD_KIND_TABLE;
-  ret.value.value.table = *value;
-  return ret;
-}
-
-amqp_table_entry_t amqp_table_construct_bool_entry(const char *key,
-                                                   const int value) {
-  amqp_table_entry_t ret;
-  ret.key = amqp_cstring_bytes(key);
-  ret.value.kind = AMQP_FIELD_KIND_BOOLEAN;
-  ret.value.value.boolean = value;
-  return ret;
-}
-
-amqp_table_entry_t *amqp_table_get_entry_by_key(const amqp_table_t *table,
-                                                const amqp_bytes_t key) {
-  int i;
-  assert(table != NULL);
-  for (i = 0; i < table->num_entries; ++i) {
-    if (amqp_bytes_equal(table->entries[i].key, key)) {
-      return &table->entries[i];
-    }
-  }
-  return NULL;
 }

@@ -72,10 +72,6 @@ if (BUILD_TOOLS_DOCS)
   endif(XMLTO_FOUND)
 endif()
 
-if (ENABLE_SSL_SUPPORT)
-  add_definitions(-DWITH_SSL=1)
-endif()
-
 install(TARGETS amqp-publish amqp-get amqp-consume amqp-declare-queue amqp-delete-queue
 	RUNTIME DESTINATION bin
 	LIBRARY DESTINATION lib

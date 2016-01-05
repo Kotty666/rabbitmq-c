@@ -33,22 +33,8 @@
 #define AMQP_SOCKET_H
 
 #include "amqp_private.h"
-#include "amqp_time.h"
 
 AMQP_BEGIN_DECLS
-
-typedef enum {
-  AMQP_SF_NONE = 0,
-  AMQP_SF_MORE = 1,
-  AMQP_SF_POLLIN = 2,
-  AMQP_SF_POLLOUT = 4,
-  AMQP_SF_POLLERR = 8
-} amqp_socket_flag_enum;
-
-typedef enum {
-  AMQP_SC_NONE = 0,
-  AMQP_SC_FORCE = 1
-} amqp_socket_close_enum;
 
 int
 amqp_os_socket_error(void);
@@ -57,15 +43,17 @@ int
 amqp_os_socket_close(int sockfd);
 
 /* Socket callbacks. */
-typedef ssize_t (*amqp_socket_send_fn)(void *, const void *, size_t, int);
+typedef ssize_t (*amqp_socket_writev_fn)(void *, struct iovec *, int);
+typedef ssize_t (*amqp_socket_send_fn)(void *, const void *, size_t);
 typedef ssize_t (*amqp_socket_recv_fn)(void *, void *, size_t, int);
 typedef int (*amqp_socket_open_fn)(void *, const char *, int, struct timeval *);
-typedef int (*amqp_socket_close_fn)(void *, amqp_socket_close_enum);
+typedef int (*amqp_socket_close_fn)(void *);
 typedef int (*amqp_socket_get_sockfd_fn)(void *);
 typedef void (*amqp_socket_delete_fn)(void *);
 
 /** V-table for amqp_socket_t */
 struct amqp_socket_class_t {
+  amqp_socket_writev_fn writev;
   amqp_socket_send_fn send;
   amqp_socket_recv_fn recv;
   amqp_socket_open_fn open;
@@ -80,6 +68,17 @@ struct amqp_socket_t_ {
 };
 
 
+#ifdef _WIN32
+/* WinSock2 calls iovec WSABUF with different parameter names.
+ * this is really a WSABUF with different names
+ */
+struct iovec {
+  u_long iov_len;
+  char FAR *iov_base;
+};
+#endif
+
+
 /**
  * Set set the socket object for a connection
  *
@@ -92,6 +91,22 @@ struct amqp_socket_t_ {
 void
 amqp_set_socket(amqp_connection_state_t state, amqp_socket_t *socket);
 
+/**
+ * Write to a socket.
+ *
+ * This function wraps writev(2) functionality.
+ *
+ * This function will only reutrn on error, or when all of the bytes referred
+ * to in iov have been sent. NOTE: this function may modify the iov struct.
+ *
+ * \param [in,out] self A socket object.
+ * \param [in] iov One or more data vecors.
+ * \param [in] iovcnt The number of vectors in \e iov.
+ *
+ * \return AMQP_STATUS_OK on success. amqp_status_enum value otherwise
+ */
+ssize_t
+amqp_socket_writev(amqp_socket_t *self, struct iovec *iov, int iovcnt);
 
 /**
  * Send a message from a socket.
@@ -104,15 +119,11 @@ amqp_set_socket(amqp_connection_state_t state, amqp_socket_t *socket);
  * \param [in,out] self A socket object.
  * \param [in] buf A buffer to read from.
  * \param [in] len The number of bytes in \e buf.
- * \param [in]
  *
  * \return AMQP_STATUS_OK on success. amqp_status_enum value otherwise
  */
 ssize_t
-amqp_socket_send(amqp_socket_t *self, const void *buf, size_t len, int flags);
-
-ssize_t amqp_try_send(amqp_connection_state_t state, const void *buf,
-                      size_t len, amqp_time_t deadline, int flags);
+amqp_socket_send(amqp_socket_t *self, const void *buf, size_t len);
 
 /**
  * Receive a message from a socket.
@@ -137,13 +148,11 @@ amqp_socket_recv(amqp_socket_t *self, void *buf, size_t len, int flags);
  * longer be referenced.
  *
  * \param [in,out] self A socket object.
- * \param [in] force, if set, just close the socket, don't attempt a TLS
- * shutdown.
  *
  * \return Zero upon success, non-zero otherwise.
  */
 int
-amqp_socket_close(amqp_socket_t *self, amqp_socket_close_enum force);
+amqp_socket_close(amqp_socket_t *self);
 
 /**
  * Destroy a socket object
@@ -170,16 +179,6 @@ amqp_socket_delete(amqp_socket_t *self);
 int
 amqp_open_socket_noblock(char const *hostname, int portnumber, struct timeval *timeout);
 
-int amqp_open_socket_inner(char const *hostname, int portnumber,
-                           amqp_time_t deadline);
-
-/* Wait up to dealline for fd to become readable or writeable depending on
- * event (AMQP_SF_POLLIN, AMQP_SF_POLLOUT) */
-int amqp_poll(int fd, int event, amqp_time_t deadline);
-
-int amqp_send_method_inner(amqp_connection_state_t state,
-                           amqp_channel_t channel, amqp_method_number_t id,
-                           void *decoded, int flags);
 int
 amqp_queue_frame(amqp_connection_state_t state, amqp_frame_t *frame);
 
@@ -191,11 +190,6 @@ amqp_simple_wait_frame_on_channel(amqp_connection_state_t state,
                                   amqp_channel_t channel,
                                   amqp_frame_t *decoded_frame);
 
-int
-sasl_mechanism_in_list(amqp_bytes_t mechanisms, amqp_sasl_method_enum method);
-
-int amqp_merge_capabilities(const amqp_table_t *base, const amqp_table_t *add,
-                            amqp_table_t *result, amqp_pool_t *pool);
 AMQP_END_DECLS
 
 #endif /* AMQP_SOCKET_H */
